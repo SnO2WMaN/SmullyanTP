@@ -145,7 +145,7 @@ abbrev false_proper_sentences (M : SmullyanModel) : Set M.ProperSentence := M.tr
 
 
 def Sentence.isTrue (S : M.Sentence) := S ∈ M.true_sentences
-prefix:90 "⊨ " => Sentence.isTrue
+prefix:50 "⊨ " => Sentence.isTrue
 
 lemma Sentence.iff_isTrue {S : M.Sentence} : ⊨ S ↔ S.word ∈ S.pred.valuated := by rfl
 
@@ -169,7 +169,7 @@ prefix:90 "~" => Sentence.neg
 @[simp] lemma Sentence.eq_neg_word {S : M.Sentence} : (~S).word = S.word := by rfl
 
 def Sentence.isNegatedTrue (S : M.Sentence) := ⊨ ~S
-prefix:90 "⊭ " => Sentence.isNegatedTrue
+prefix:50 "⊭ " => Sentence.isNegatedTrue
 
 lemma Sentence.iff_isNegatedTrue {S : M.Sentence} : ⊭ S ↔ (~S).word ∈ (~S).pred.valuated := by simp [Sentence.isNegatedTrue, Sentence.iff_isTrue]
 

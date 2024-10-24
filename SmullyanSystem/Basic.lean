@@ -3,11 +3,25 @@ import Mathlib.Data.Set.Defs
 import Mathlib.Logic.ExistsUnique
 import Aesop
 
+namespace List
+
+def IsProperPrefix (l₁ l₂ : List α) := ∃ t ≠ [], l₁ ++ t = l₂
+infixl:50 " <+:: " => IsProperPrefix
+
+variable {l₁ l₂ : List α}
+
+lemma isPrefix_of_isProperPrefix : l₁ <+:: l₂ → l₁ <+: l₂ := by
+  intro h;
+  obtain ⟨t, _, h⟩ := h;
+  use t;
+
+end List
+
 
 structure SmullyanModel where
   α : Type*
   isPredicate : List α → Prop
-  isPredicate_spec : ∀ p : { x // isPredicate x }, ∀ x ≠ [], ¬isPredicate (p.val ++ x)
+  isPredicate_spec : ∀ P : { x // isPredicate x }, ∀ x ≠ [], ¬isPredicate (P.val ++ x)
   valuation : { x // isPredicate x } → Set (List α)
 
 namespace SmullyanModel
@@ -36,10 +50,10 @@ def Predicate.names (P : M.Predicate) (V : Set M.Word) : Prop := P.valuated = V
 
 
 structure Sentence (M : SmullyanModel) where
-  P : M.Predicate
-  W : M.Word
+  pred : M.Predicate
+  word : M.Word
 
-lemma Sentence.ext : ∀ {S₁ S₂ : M.Sentence}, S₁.P = S₂.P → S₁.W = S₂.W → S₁ = S₂ := by
+lemma Sentence.ext : ∀ {S₁ S₂ : M.Sentence}, S₁.pred = S₂.pred → S₁.word = S₂.word → S₁ = S₂ := by
   intros S₁ S₂ hP hW;
   cases S₁; cases S₂;
   subst hP hW;
@@ -49,22 +63,63 @@ abbrev sentences (M : SmullyanModel) : Set M.Sentence := Set.univ
 
 def Sentence.toWord : M.Sentence → M.Word := fun ⟨P, W⟩ => P ++ W
 
-lemma Sentence.exists_unique (S : M.Sentence) : ∃! P, ∃! W, ⟨P, W⟩ = S := by sorry;
+lemma Sentence.exists_unique_pred_word (S : M.Sentence) : ∃! P, ∃! W, ⟨P, W⟩ = S := by
+  apply exists_unique_of_exists_of_unique;
+  . use S.pred;
+    apply exists_unique_of_exists_of_unique;
+    . use S.word;
+    . rintro W₁ W₂ h₁ h₂;
+      rw [←h₂] at h₁;
+      simpa using h₁;
+  . intro P₁ P₂ ⟨W₁, h₁, _⟩ ⟨W₂, h₂, _⟩;
+    subst h₁;
+    simp_all only [mk.injEq, true_and, implies_true];
+
+lemma Sentence.exists_unique_pred (S : M.Sentence) : ∃! P, ⟨P, S.word⟩ = S := by
+  apply exists_unique_of_exists_of_unique;
+  . use S.pred;
+  . intro P₁ P₂ h₁ h₂;
+    rw [←h₂] at h₁;
+    simpa using h₁;
+
+lemma Sentence.exists_unique_pred_toWord (S : M.Sentence) : ∃! P : M.Predicate, ∃ W : M.Word, P ++ W = S.toWord := by
+  simp only [Sentence.toWord];
+  apply exists_unique_of_exists_of_unique;
+  . use S.pred, S.word;
+  . rintro P₁ P₂ ⟨W₁, h₁⟩ ⟨W₂, h₂⟩;
+    wlog h : (P₁.val <+:: P₂.val);
+    . refine this S P₂ P₁ W₂ h₂ W₁ h₁ ?_ |>.symm;
+      simp [List.IsProperPrefix] at h;
+      sorry;
+    obtain ⟨t, ht, h⟩ := h;
+    have := M.isPredicate_spec P₁ t ht;
+    simp [h] at this;
+
+lemma Sentence.exists_unique_word (S : M.Sentence) : ∃! W, ⟨S.pred, W⟩ = S := by
+  apply exists_unique_of_exists_of_unique;
+  . use S.word;
+  . intro W₁ W₂ h₁ h₂;
+    rw [←h₂] at h₁;
+    simpa using h₁;
 
 @[simp]
 lemma Sentence.toWord_injective : Function.Injective (Sentence.toWord (M := M)) := by
   simp [Function.Injective, Sentence.toWord];
   intro S₁ S₂ h;
-  obtain ⟨P₁, ⟨W₁, rfl, hW₁⟩, hP₁⟩ := Sentence.exists_unique S₁;
-  obtain ⟨P₂, ⟨W₂, rfl, hW₂⟩, hP₂⟩ := Sentence.exists_unique S₂;
-  sorry;
-
+  obtain ⟨P₁, ⟨W₁, hw₁⟩, h₁⟩ := Sentence.exists_unique_pred_toWord S₁;
+  obtain ⟨P₂, ⟨W₂, hw₂⟩, h₂⟩ := Sentence.exists_unique_pred_toWord S₂;
+  simp at h₁ h₂;
+  have := h₁ P₂ P₂.prop W₂;
+  have := h₂ P₂ P₂.prop W₂ hw₂;
+  apply Sentence.ext;
+  . sorry;
+  . sorry;
 
 instance : Coe (M.Sentence) (M.Word) := ⟨Sentence.toWord⟩
 
 instance : Coe (Set M.Sentence) (Set M.Word) := ⟨fun s => s.image Sentence.toWord⟩
 
-@[simp] lemma Sentence.iff_toWord {S : M.Sentence} : S.toWord = S.P ++ S.W := by rfl
+@[simp] lemma Sentence.iff_toWord {S : M.Sentence} : S.toWord = S.pred ++ S.word := by rfl
 
 def isSentence (W : M.Word) : Prop := ∃ S : M.Sentence, W = S
 
@@ -92,16 +147,7 @@ abbrev false_proper_sentences (M : SmullyanModel) : Set M.ProperSentence := M.tr
 def Sentence.isTrue (S : M.Sentence) := S ∈ M.true_sentences
 prefix:90 "⊨ " => Sentence.isTrue
 
-lemma Sentence.iff_isTrue : ⊨ S ↔ S.W ∈ S.P.valuated := by rfl
-
-
-def Sentence.isFalse (S : M.Sentence) := S ∈ M.false_sentences
-prefix:90 "⊭ " => Sentence.isFalse
-
-lemma Sentence.iff_isFalse_not_isTrue : ⊭ S ↔ ¬⊨ S := by simp [false_sentences, Sentence.isTrue, Sentence.isFalse]
-
-lemma Sentence.iff_isFalse : ⊭ S ↔ S.W ∉ S.P.valuated := by simp [iff_isTrue, iff_isFalse_not_isTrue]
-
+lemma Sentence.iff_isTrue {S : M.Sentence} : ⊨ S ↔ S.word ∈ S.pred.valuated := by rfl
 
 class IsN (M : SmullyanModel) where
   n : M.α
@@ -110,19 +156,34 @@ class IsN (M : SmullyanModel) where
 
 section
 
-variable [M.IsN]
+variable [M.IsN] {P : M.Predicate} {S : M.Sentence}
 
-def Predicate.negated (P : M.Predicate) : M.Predicate := ⟨IsN.n :: P.val, IsN.n_spec₁ P⟩
-prefix:90 "~" => Predicate.negated
+def Predicate.neg (P : M.Predicate) : M.Predicate := ⟨IsN.n :: P.val, IsN.n_spec₁ P⟩
+prefix:90 "~" => Predicate.neg
 
-def Sentence.negated (S : M.Sentence) : M.Sentence := ⟨~S.P, S.W⟩
-prefix:90 "~" => Sentence.negated
+def Sentence.neg (S : M.Sentence) : M.Sentence := ⟨~S.pred, S.word⟩
+prefix:90 "~" => Sentence.neg
 
-def Sentence.isNegTrue (S : M.Sentence) := ⊨ ~S
+@[simp] lemma Sentence.eq_neg_pred {S : M.Sentence} : (~S).pred = ~(S.pred) := by rfl
+
+@[simp] lemma Sentence.eq_neg_word {S : M.Sentence} : (~S).word = S.word := by rfl
+
+def Sentence.isNegatedTrue (S : M.Sentence) := ⊨ ~S
+prefix:90 "⊭ " => Sentence.isNegatedTrue
+
+lemma Sentence.iff_isNegatedTrue {S : M.Sentence} : ⊭ S ↔ (~S).word ∈ (~S).pred.valuated := by simp [Sentence.isNegatedTrue, Sentence.iff_isTrue]
+
+@[simp] lemma Predicate.eq_neg_valuated {P : M.Predicate} : (~P).valuated = P.valuatedᶜ := IsN.n_spec₂ P
+
+@[simp] lemma Predicate.eq_double_neg_valuated (P : M.Predicate) : (~~P).valuated = P.valuated := by simp_all only [eq_neg_valuated, compl_compl];
+
+lemma Sentence.iff_isNegTrue_neg_isTrue : ⊭ ~S ↔ ⊨ S := by
+  simp [Sentence.iff_isTrue, Sentence.isNegatedTrue];
 
 @[simp]
-lemma iff_negated_valuated {P : M.Predicate} : (~P).valuated = P.valuatedᶜ := by
-  simp [Predicate.valuated, Predicate.negated, IsN.n_spec₂ P];
+lemma Sentence.iff_isNegTrue_not_isTrue : ⊭ S ↔ ¬⊨ S := by
+  simp only [Sentence.isNegatedTrue, Sentence.neg, Sentence.iff_isTrue, Predicate.eq_neg_valuated];
+  tauto;
 
 end
 
@@ -136,15 +197,19 @@ section
 
 variable [M.IsR]
 
-def Predicate.repeated (P : M.Predicate) : M.Predicate := ⟨IsR.r :: P.val, IsR.r_spec₁ P⟩
-prefix:90 "□" => Predicate.repeated
+def Predicate.ros (P : M.Predicate) : M.Predicate := ⟨IsR.r :: P.val, IsR.r_spec₁ P⟩
+prefix:90 "□" => Predicate.ros
 
-def Sentence.repeated (S : M.Sentence) : M.Sentence := ⟨□S.P, S.W⟩
-prefix:90 "□" => Sentence.repeated
+def Sentence.ros (S : M.Sentence) : M.Sentence := ⟨□S.pred, S.word⟩
+prefix:90 "□" => Sentence.ros
+
+@[simp] lemma Sentence.eq_ros_pred {S : M.Sentence} : (□S).pred = □(S.pred) := by rfl
+
+@[simp] lemma Sentence.eq_ros_word {S : M.Sentence} : (□S).word = S.word := by rfl
 
 @[simp]
-lemma iff_repeated_valuated {P : M.Predicate} : (□P).valuated = { K : M.Predicate | K.val ++ K.val ∈ P.valuated } := by
-  simp [Predicate.valuated, Predicate.repeated, IsR.r_spec₂ P];
+lemma eq_ros_valuated {P : M.Predicate} : (□P).valuated = { K : M.Predicate | K.val ++ K.val ∈ P.valuated } := by
+  simp [Predicate.valuated, Predicate.ros, IsR.r_spec₂ P];
 
 end
 
@@ -159,48 +224,42 @@ def Predicate.fixpoint [M.IsR] (P : M.Predicate) : M.Sentence := ⟨□P, □P�
 lemma fixpoint_spec [M.IsR] : ⊨ P.fixpoint ↔ ⊨ (⟨P, P.fixpoint⟩) := by
   simp [Predicate.fixpoint, Sentence.iff_isTrue];
 
-lemma iff_fixpoint_is_true [M.IsNR] : ⊨ (~P).fixpoint ↔ ↑(~P).fixpoint ∉ P.valuated := by
+
+lemma iff_isTrue_neg_fixpoint [M.IsNR] : ⊨ (~P).fixpoint ↔ ↑(~P).fixpoint ∉ P.valuated := by
   simp [Predicate.fixpoint, Sentence.iff_isTrue];
 
-lemma iff_eq {P : M.Predicate} : P.names M.true_sentences ↔ ∀ S : M.Sentence, (↑S ∈ P.valuated ↔ ⊨ S) := by
-  constructor;
-  . intro h S; rw [h];
-    apply Function.Injective.mem_set_image Sentence.toWord_injective;
-  . intro h;
-    sorry;
-  /-
-  simp [Predicate.names, Sentence.iff_isTrue, true_sentences];
-  constructor;
-  . intro h S;
-    replace h := subset_of_eq h;
-    constructor;
-    . intro h₂;
-      exact Function.Injective.mem_set_image Sentence.toWord_injective |>.mp $ Set.mem_of_subset_of_mem h h₂
-    . intro h₂;
-      have := @Set.mem_of_subset_of_mem (M.Word) (s₁ := P.valuated) (s₂ := M.true_sentences) (a := S.W) h;
-      sorry;
-  . intro S;
-    apply Set.eq_of_subset_of_subset;
-    . sorry;
-    . sorry;
-  -/
+lemma iff_isTrue_not_neg_fixpoint [M.IsNR] : ¬⊨ (~P).fixpoint ↔ ↑(~P).fixpoint ∈ P.valuated := by simpa using iff_isTrue_neg_fixpoint (P := P) |>.not;
+
+lemma iff_mem_toWord_true_sentence_mem_true_sentence : (S.toWord ∈ Sentence.toWord '' M.true_sentences) ↔ (S ∈ M.true_sentences) := by
+  apply Function.Injective.mem_set_image Sentence.toWord_injective;
 
 lemma iff_of_names_true_sentenes {P : M.Predicate} : P.names M.true_sentences → ∀ S : M.Sentence, (↑S ∈ P.valuated ↔ ⊨ S) := by
   intro h S; rw [h];
-  apply Function.Injective.mem_set_image Sentence.toWord_injective;
+  simp only [iff_mem_toWord_true_sentence_mem_true_sentence];
+  tauto;
 
-theorem tarski [M.IsNR] : ∀ P : M.Predicate, ¬P.names M.true_sentences := by
-  intro P;
-  apply not_imp_not.mpr $ iff_of_names_true_sentenes;
-  apply not_forall.mpr;
-  use (~P).fixpoint;
-  rw [iff_fixpoint_is_true];
+theorem tarski [M.IsNR] : ¬∃ P : M.Predicate, P.names M.true_sentences := by
+  by_contra hC;
+  obtain ⟨P, hP⟩ := hC;
+  let S := (~P).fixpoint;
+  have : ↑S ∈ P.valuated ↔ ⊨ S := iff_of_names_true_sentenes hP S;
+  rw [iff_isTrue_neg_fixpoint] at this;
   tauto;
 
 theorem goedel1 [M.IsNR] (hP : P.valuated ⊆ M.true_sentences) : ∃ S : M.Sentence, ↑S ∉ P.valuated ∧ ↑(~S) ∉ P.valuated := by
-  use (~P).fixpoint;
+  let S := (~P).fixpoint;
+  use S;
+  have h : ⊨ S := by
+    by_contra hC;
+    have : ↑S ∈ P.valuated := iff_isTrue_not_neg_fixpoint.mp hC;
+    have : ⊨ S := iff_mem_toWord_true_sentence_mem_true_sentence.mp $ hP this;
+    contradiction;
   constructor;
-  . sorry;
-  . sorry;
+  . exact iff_isTrue_neg_fixpoint.mp h;
+  . apply Set.not_mem_subset (s := P.valuated) (t := M.true_sentences) hP;
+    apply iff_mem_toWord_true_sentence_mem_true_sentence.not.mpr;
+    apply Sentence.iff_isNegTrue_not_isTrue.mp;
+    apply Sentence.iff_isNegTrue_neg_isTrue.mpr;
+    assumption;
 
 end SmullyanModel

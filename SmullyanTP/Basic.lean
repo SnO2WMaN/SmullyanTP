@@ -1,25 +1,6 @@
-import Mathlib.Tactic
-import Mathlib.Data.Set.Defs
+import SmullyanTP.List
 import Mathlib.Logic.ExistsUnique
 import Aesop
-
-namespace List
-
-def IsProperPrefix (l₁ l₂ : List α) := ∃ t ≠ [], l₁ ++ t = l₂
-infixl:50 " <+:: " => IsProperPrefix
-
-variable {l₁ l₂ : List α}
-
-lemma isPrefix_of_isProperPrefix : l₁ <+:: l₂ → l₁ <+: l₂ := by
-  intro h;
-  obtain ⟨t, _, h⟩ := h;
-  use t;
-
-lemma iff_not_isProperPrefix : ¬(l₁ <+:: l₂) ↔ (∀ t, t = [] ∨ l₁ ++ t ≠ l₂) := by
-  simp only [IsProperPrefix, not_exists, not_and_or, ne_eq, not_not];
-
-end List
-
 
 structure SmullyanModel where
   α : Type*
@@ -93,9 +74,12 @@ lemma exists_unique_pred_toWord (S : M.Sentence) : ∃! P : M.Predicate, ∃ W :
   apply exists_unique_of_exists_of_unique;
   . use S.pred, S.word;
   . rintro P₁ P₂ ⟨W₁, h₁⟩ ⟨W₂, h₂⟩;
+    rw [←h₂] at h₁; clear h₂;
     wlog h : (P₁.val <+:: P₂.val);
-    . refine this S P₂ P₁ W₂ h₂ W₁ h₁ ?_ |>.symm;
-      sorry;
+    . rcases List.IsProperPrefix.trichnomy h₁ with h | h | h;
+      . exact Subtype.eq h;
+      . contradiction;
+      . exact this S P₂ P₁ W₂ W₁ h₁.symm h |>.symm;
     obtain ⟨t, ht, h⟩ := h;
     have := M.isPredicate_spec P₁ t ht;
     simp [h, isPredicate_predicate] at this;

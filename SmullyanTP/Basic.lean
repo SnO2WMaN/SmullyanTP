@@ -15,6 +15,9 @@ lemma isPrefix_of_isProperPrefix : l₁ <+:: l₂ → l₁ <+: l₂ := by
   obtain ⟨t, _, h⟩ := h;
   use t;
 
+lemma iff_not_isProperPrefix : ¬(l₁ <+:: l₂) ↔ (∀ t, t = [] ∨ l₁ ++ t ≠ l₂) := by
+  simp only [IsProperPrefix, not_exists, not_and_or, ne_eq, not_not];
+
 end List
 
 
@@ -31,39 +34,42 @@ variable {M : SmullyanModel}
 
 abbrev Word (M : SmullyanModel) := List M.α
 
-abbrev words (M : SmullyanModel) : Set M.Word := Set.univ
-
 abbrev epsilon (M : SmullyanModel) : M.Word := []
 
 
 abbrev Predicate (M : SmullyanModel) := { P // M.isPredicate P }
 
-abbrev predicates (M : SmullyanModel) : Set M.Predicate := Set.univ
+namespace Predicate
 
 instance : Coe (Set M.Predicate) (Set M.Word) := ⟨fun s => s.image (·.val)⟩
 
+def valuated (P : M.Predicate) : Set M.Word := M.valuation P
+
+def names (P : M.Predicate) (V : Set M.Word) : Prop := P.valuated = V
+
+end Predicate
+
 @[simp] lemma isPredicate_predicate {P : M.Predicate} : M.isPredicate P.val := P.property
-
-def Predicate.valuated (P : M.Predicate) : Set M.Word := M.valuation P
-
-def Predicate.names (P : M.Predicate) (V : Set M.Word) : Prop := P.valuated = V
 
 
 structure Sentence (M : SmullyanModel) where
   pred : M.Predicate
   word : M.Word
 
-lemma Sentence.ext : ∀ {S₁ S₂ : M.Sentence}, S₁.pred = S₂.pred → S₁.word = S₂.word → S₁ = S₂ := by
-  intros S₁ S₂ hP hW;
+namespace Sentence
+
+def toWord : M.Sentence → M.Word := fun ⟨P, W⟩ => P ++ W
+
+lemma eq_of_eq_pred_of_eq_word {S₁ S₂ : M.Sentence} (hP : S₁.pred = S₂.pred) (hW : S₁.word = S₂.word) :  S₁ = S₂ := by
   cases S₁; cases S₂;
   subst hP hW;
   tauto;
 
-abbrev sentences (M : SmullyanModel) : Set M.Sentence := Set.univ
+lemma eq_of_eq_toWord_eq_pred {S₁ S₂ : M.Sentence} (h : S₁.toWord = S₂.toWord) (hS : S₁.pred = S₂.pred) : S₁ = S₂ := by
+  simp [toWord, hS] at h;
+  apply Sentence.eq_of_eq_pred_of_eq_word <;> assumption;
 
-def Sentence.toWord : M.Sentence → M.Word := fun ⟨P, W⟩ => P ++ W
-
-lemma Sentence.exists_unique_pred_word (S : M.Sentence) : ∃! P, ∃! W, ⟨P, W⟩ = S := by
+lemma exists_unique_pred_word (S : M.Sentence) : ∃! P, ∃! W, ⟨P, W⟩ = S := by
   apply exists_unique_of_exists_of_unique;
   . use S.pred;
     apply exists_unique_of_exists_of_unique;
@@ -75,27 +81,26 @@ lemma Sentence.exists_unique_pred_word (S : M.Sentence) : ∃! P, ∃! W, ⟨P, 
     subst h₁;
     simp_all only [mk.injEq, true_and, implies_true];
 
-lemma Sentence.exists_unique_pred (S : M.Sentence) : ∃! P, ⟨P, S.word⟩ = S := by
+lemma exists_unique_pred (S : M.Sentence) : ∃! P, ⟨P, S.word⟩ = S := by
   apply exists_unique_of_exists_of_unique;
   . use S.pred;
   . intro P₁ P₂ h₁ h₂;
     rw [←h₂] at h₁;
     simpa using h₁;
 
-lemma Sentence.exists_unique_pred_toWord (S : M.Sentence) : ∃! P : M.Predicate, ∃ W : M.Word, P ++ W = S.toWord := by
-  simp only [Sentence.toWord];
+lemma exists_unique_pred_toWord (S : M.Sentence) : ∃! P : M.Predicate, ∃ W : M.Word, P ++ W = S.toWord := by
+  dsimp only [Sentence.toWord];
   apply exists_unique_of_exists_of_unique;
   . use S.pred, S.word;
   . rintro P₁ P₂ ⟨W₁, h₁⟩ ⟨W₂, h₂⟩;
     wlog h : (P₁.val <+:: P₂.val);
     . refine this S P₂ P₁ W₂ h₂ W₁ h₁ ?_ |>.symm;
-      simp [List.IsProperPrefix] at h;
       sorry;
     obtain ⟨t, ht, h⟩ := h;
     have := M.isPredicate_spec P₁ t ht;
-    simp [h] at this;
+    simp [h, isPredicate_predicate] at this;
 
-lemma Sentence.exists_unique_word (S : M.Sentence) : ∃! W, ⟨S.pred, W⟩ = S := by
+lemma exists_unique_word (S : M.Sentence) : ∃! W, ⟨S.pred, W⟩ = S := by
   apply exists_unique_of_exists_of_unique;
   . use S.word;
   . intro W₁ W₂ h₁ h₂;
@@ -103,23 +108,24 @@ lemma Sentence.exists_unique_word (S : M.Sentence) : ∃! W, ⟨S.pred, W⟩ = S
     simpa using h₁;
 
 @[simp]
-lemma Sentence.toWord_injective : Function.Injective (Sentence.toWord (M := M)) := by
-  simp [Function.Injective, Sentence.toWord];
+lemma toWord_injective : Function.Injective (Sentence.toWord (M := M)) := by
+  simp [Function.Injective];
   intro S₁ S₂ h;
-  obtain ⟨P₁, ⟨W₁, hw₁⟩, h₁⟩ := Sentence.exists_unique_pred_toWord S₁;
-  obtain ⟨P₂, ⟨W₂, hw₂⟩, h₂⟩ := Sentence.exists_unique_pred_toWord S₂;
-  simp at h₁ h₂;
-  have := h₁ P₂ P₂.prop W₂;
-  have := h₂ P₂ P₂.prop W₂ hw₂;
-  apply Sentence.ext;
-  . sorry;
-  . sorry;
+  apply Sentence.eq_of_eq_toWord_eq_pred h;
+  obtain ⟨P₁, ⟨W₁, e₁⟩, h₁⟩ := Sentence.exists_unique_pred_toWord S₁;
+  have := h₁ S₂.pred $ by use S₂.word; exact h.symm;
+  subst this;
+  apply h₁;
+  use S₁.word;
+  tauto;
 
 instance : Coe (M.Sentence) (M.Word) := ⟨Sentence.toWord⟩
 
 instance : Coe (Set M.Sentence) (Set M.Word) := ⟨fun s => s.image Sentence.toWord⟩
 
-@[simp] lemma Sentence.iff_toWord {S : M.Sentence} : S.toWord = S.pred ++ S.word := by rfl
+@[simp] lemma iff_toWord {S : M.Sentence} : S.toWord = S.pred ++ S.word := by rfl
+
+end Sentence
 
 def isSentence (W : M.Word) : Prop := ∃ S : M.Sentence, W = S
 
@@ -129,8 +135,6 @@ def isSentence (W : M.Word) : Prop := ∃ S : M.Sentence, W = S
 
 structure ProperSentence (M : SmullyanModel) extends M.Sentence where
   W_nonempty : W ≠ []
-
-abbrev proper_sentences (M : SmullyanModel) : Set M.ProperSentence := Set.univ
 
 def isProperSentence (W : M.Word) : Prop := M.isSentence W ∧ ¬M.isPredicate W
 
@@ -148,6 +152,7 @@ def Sentence.isTrue (S : M.Sentence) := S ∈ M.true_sentences
 prefix:50 "⊨ " => Sentence.isTrue
 
 lemma Sentence.iff_isTrue {S : M.Sentence} : ⊨ S ↔ S.word ∈ S.pred.valuated := by rfl
+
 
 class IsN (M : SmullyanModel) where
   n : M.α
@@ -197,19 +202,19 @@ section
 
 variable [M.IsR]
 
-def Predicate.ros (P : M.Predicate) : M.Predicate := ⟨IsR.r :: P.val, IsR.r_spec₁ P⟩
-prefix:90 "□" => Predicate.ros
+def Predicate.rep (P : M.Predicate) : M.Predicate := ⟨IsR.r :: P.val, IsR.r_spec₁ P⟩
+prefix:90 "□" => Predicate.rep
 
-def Sentence.ros (S : M.Sentence) : M.Sentence := ⟨□S.pred, S.word⟩
-prefix:90 "□" => Sentence.ros
+def Sentence.rep (S : M.Sentence) : M.Sentence := ⟨□S.pred, S.word⟩
+prefix:90 "□" => Sentence.rep
 
-@[simp] lemma Sentence.eq_ros_pred {S : M.Sentence} : (□S).pred = □(S.pred) := by rfl
+@[simp] lemma Sentence.eq_rep_pred {S : M.Sentence} : (□S).pred = □(S.pred) := by rfl
 
-@[simp] lemma Sentence.eq_ros_word {S : M.Sentence} : (□S).word = S.word := by rfl
+@[simp] lemma Sentence.eq_rep_word {S : M.Sentence} : (□S).word = S.word := by rfl
 
 @[simp]
-lemma eq_ros_valuated {P : M.Predicate} : (□P).valuated = { K : M.Predicate | K.val ++ K.val ∈ P.valuated } := by
-  simp [Predicate.valuated, Predicate.ros, IsR.r_spec₂ P];
+lemma eq_rep_valuated {P : M.Predicate} : (□P).valuated = { K : M.Predicate | K.val ++ K.val ∈ P.valuated } := by
+  simp [Predicate.valuated, Predicate.rep, IsR.r_spec₂ P];
 
 end
 

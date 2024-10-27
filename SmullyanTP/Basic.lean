@@ -5,7 +5,7 @@ import Aesop
 structure SmullyanModel where
   α : Type*
   isPredicate : List α → Prop
-  isPredicate_spec : ∀ P : { x // isPredicate x }, ∀ x ≠ [], ¬isPredicate (P.val ++ x)
+  isPredicate_spec : ∀ H : { x // isPredicate x }, ∀ x ≠ [], ¬isPredicate (H.val ++ x)
   valuation : { x // isPredicate x } → Set (List α)
 
 namespace SmullyanModel
@@ -18,19 +18,19 @@ abbrev Word (M : SmullyanModel) := List M.α
 abbrev epsilon (M : SmullyanModel) : M.Word := []
 
 
-abbrev Predicate (M : SmullyanModel) := { P // M.isPredicate P }
+abbrev Predicate (M : SmullyanModel) := { H // M.isPredicate H }
 
 namespace Predicate
 
 instance : Coe (Set M.Predicate) (Set M.Word) := ⟨fun s => s.image (·.val)⟩
 
-def valuated (P : M.Predicate) : Set M.Word := M.valuation P
+def valuated (H : M.Predicate) : Set M.Word := M.valuation H
 
-def names (P : M.Predicate) (V : Set M.Word) : Prop := P.valuated = V
+def names (H : M.Predicate) (V : Set M.Word) : Prop := H.valuated = V
 
 end Predicate
 
-@[simp] lemma isPredicate_predicate {P : M.Predicate} : M.isPredicate P.val := P.property
+@[simp] lemma isPredicate_predicate {H : M.Predicate} : M.isPredicate H.val := H.property
 
 
 structure Sentence (M : SmullyanModel) where
@@ -39,11 +39,11 @@ structure Sentence (M : SmullyanModel) where
 
 namespace Sentence
 
-def toWord : M.Sentence → M.Word := fun ⟨P, W⟩ => P ++ W
+def toWord : M.Sentence → M.Word := fun ⟨H, X⟩ => H ++ X
 
-lemma eq_of_eq_pred_of_eq_word {S₁ S₂ : M.Sentence} (hP : S₁.pred = S₂.pred) (hW : S₁.word = S₂.word) :  S₁ = S₂ := by
+lemma eq_of_eq_pred_of_eq_word {S₁ S₂ : M.Sentence} (hH : S₁.pred = S₂.pred) (hX : S₁.word = S₂.word) : S₁ = S₂ := by
   cases S₁; cases S₂;
-  subst hP hW;
+  subst hH hX;
   tauto;
 
 lemma eq_of_eq_toWord_eq_pred {S₁ S₂ : M.Sentence} (h : S₁.toWord = S₂.toWord) (hS : S₁.pred = S₂.pred) : S₁ = S₂ := by
@@ -69,7 +69,7 @@ lemma exists_unique_pred (S : M.Sentence) : ∃! P, ⟨P, S.word⟩ = S := by
     rw [←h₂] at h₁;
     simpa using h₁;
 
-lemma exists_unique_pred_toWord (S : M.Sentence) : ∃! P : M.Predicate, ∃ W : M.Word, P ++ W = S.toWord := by
+lemma exists_unique_pred_toWord (S : M.Sentence) : ∃! H : M.Predicate, ∃ X : M.Word, H ++ X = S.toWord := by
   dsimp only [Sentence.toWord];
   apply exists_unique_of_exists_of_unique;
   . use S.pred, S.word;
@@ -111,21 +111,21 @@ instance : Coe (Set M.Sentence) (Set M.Word) := ⟨fun s => s.image Sentence.toW
 
 end Sentence
 
-def isSentence (W : M.Word) : Prop := ∃ S : M.Sentence, W = S
+def isSentence (X : M.Word) : Prop := ∃ S : M.Sentence, X = S
 
 @[simp] lemma isSentence_sentence {S : M.Sentence} : M.isSentence S := ⟨S, rfl⟩
 
 
 
 structure ProperSentence (M : SmullyanModel) extends M.Sentence where
-  W_nonempty : W ≠ []
+  word_nonempty : X ≠ []
 
-def isProperSentence (W : M.Word) : Prop := M.isSentence W ∧ ¬M.isPredicate W
+def isProperSentence (X : M.Word) : Prop := M.isSentence X ∧ ¬M.isPredicate X
 
 
-abbrev true_sentences (M : SmullyanModel) : Set M.Sentence := fun ⟨P, W⟩ => W ∈ P.valuated
+abbrev true_sentences (M : SmullyanModel) : Set M.Sentence := fun ⟨P, X⟩ => X ∈ P.valuated
 
-abbrev true_proper_sentences (M : SmullyanModel) : Set M.ProperSentence := fun ⟨⟨P, W⟩, _⟩ => W ∈ M.valuation P
+abbrev true_proper_sentences (M : SmullyanModel) : Set M.ProperSentence := fun ⟨⟨P, X⟩, _⟩ => X ∈ M.valuation P
 
 abbrev false_sentences (M : SmullyanModel) : Set M.Sentence := M.true_sentencesᶜ
 
@@ -140,14 +140,14 @@ lemma Sentence.iff_isTrue {S : M.Sentence} : ⊨ S ↔ S.word ∈ S.pred.valuate
 
 class IsN (M : SmullyanModel) where
   n : M.α
-  n_spec₁ : ∀ P : M.Predicate, (M.isPredicate (n :: P))
-  n_spec₂ : ∀ P : M.Predicate, M.valuation ⟨n :: P, n_spec₁ P⟩ = (P.valuated)ᶜ
+  n_spec₁ : ∀ H : M.Predicate, (M.isPredicate (n :: H))
+  n_spec₂ : ∀ H : M.Predicate, M.valuation ⟨n :: H, n_spec₁ H⟩ = (H.valuated)ᶜ
 
 section
 
-variable [M.IsN] {P : M.Predicate} {S : M.Sentence}
+variable [M.IsN] {H : M.Predicate} {S : M.Sentence}
 
-def Predicate.neg (P : M.Predicate) : M.Predicate := ⟨IsN.n :: P.val, IsN.n_spec₁ P⟩
+def Predicate.neg (H : M.Predicate) : M.Predicate := ⟨IsN.n :: H.val, IsN.n_spec₁ H⟩
 prefix:90 "~" => Predicate.neg
 
 def Sentence.neg (S : M.Sentence) : M.Sentence := ⟨~S.pred, S.word⟩
@@ -162,14 +162,13 @@ prefix:50 "⊭ " => Sentence.isNegatedTrue
 
 lemma Sentence.iff_isNegatedTrue {S : M.Sentence} : ⊭ S ↔ (~S).word ∈ (~S).pred.valuated := by simp [Sentence.isNegatedTrue, Sentence.iff_isTrue]
 
-@[simp] lemma Predicate.eq_neg_valuated {P : M.Predicate} : (~P).valuated = P.valuatedᶜ := IsN.n_spec₂ P
+@[simp] lemma Predicate.eq_neg_valuated {H : M.Predicate} : (~H).valuated = H.valuatedᶜ := IsN.n_spec₂ H
 
-@[simp] lemma Predicate.eq_double_neg_valuated (P : M.Predicate) : (~~P).valuated = P.valuated := by simp_all only [eq_neg_valuated, compl_compl];
+@[simp] lemma Predicate.eq_double_neg_valuated (H : M.Predicate) : (~~H).valuated = H.valuated := by simp_all only [eq_neg_valuated, compl_compl];
 
 lemma Sentence.iff_isNegTrue_neg_isTrue : ⊭ ~S ↔ ⊨ S := by
   simp [Sentence.iff_isTrue, Sentence.isNegatedTrue];
 
-@[simp]
 lemma Sentence.iff_isNegTrue_not_isTrue : ⊭ S ↔ ¬⊨ S := by
   simp only [Sentence.isNegatedTrue, Sentence.neg, Sentence.iff_isTrue, Predicate.eq_neg_valuated];
   tauto;
@@ -179,14 +178,14 @@ end
 
 class IsR (M : SmullyanModel) where
   r : M.α
-  r_spec₁ : ∀ P : M.Predicate, (M.isPredicate (r :: P))
-  r_spec₂ : ∀ P : M.Predicate, M.valuation ⟨r :: P, r_spec₁ P⟩ = { K : M.Predicate | K.val ++ K.val ∈ P.valuated }
+  r_spec₁ : ∀ H : M.Predicate, (M.isPredicate (r :: H))
+  r_spec₂ : ∀ H : M.Predicate, M.valuation ⟨r :: H, r_spec₁ H⟩ = { K : M.Predicate | K.val ++ K.val ∈ H.valuated }
 
 section
 
 variable [M.IsR]
 
-def Predicate.rep (P : M.Predicate) : M.Predicate := ⟨IsR.r :: P.val, IsR.r_spec₁ P⟩
+def Predicate.rep (H : M.Predicate) : M.Predicate := ⟨IsR.r :: H.val, IsR.r_spec₁ H⟩
 prefix:90 "□" => Predicate.rep
 
 def Sentence.rep (S : M.Sentence) : M.Sentence := ⟨□S.pred, S.word⟩
@@ -197,8 +196,8 @@ prefix:90 "□" => Sentence.rep
 @[simp] lemma Sentence.eq_rep_word {S : M.Sentence} : (□S).word = S.word := by rfl
 
 @[simp]
-lemma eq_rep_valuated {P : M.Predicate} : (□P).valuated = { K : M.Predicate | K.val ++ K.val ∈ P.valuated } := by
-  simp [Predicate.valuated, Predicate.rep, IsR.r_spec₂ P];
+lemma eq_rep_valuated {H : M.Predicate} : (□H).valuated = { K : M.Predicate | K.val ++ K.val ∈ H.valuated } := by
+  simp [Predicate.valuated, Predicate.rep, IsR.r_spec₂ H];
 
 end
 
@@ -206,46 +205,46 @@ end
 class IsNR (M : SmullyanModel) extends IsN M, IsR M where
 
 
-variable {P : M.Predicate} {S : M.Sentence}
+variable {H : M.Predicate} {S : M.Sentence}
 
-def Predicate.fixpoint [M.IsR] (P : M.Predicate) : M.Sentence := ⟨□P, □P⟩
+def Predicate.fixpoint [M.IsR] (H : M.Predicate) : M.Sentence := ⟨□H, □H⟩
 
-lemma fixpoint_spec [M.IsR] : ⊨ P.fixpoint ↔ ⊨ (⟨P, P.fixpoint⟩) := by
+lemma fixpoint_spec [M.IsR] : ⊨ H.fixpoint ↔ ⊨ (⟨H, H.fixpoint⟩) := by
   simp [Predicate.fixpoint, Sentence.iff_isTrue];
 
 
-lemma iff_isTrue_neg_fixpoint [M.IsNR] : ⊨ (~P).fixpoint ↔ ↑(~P).fixpoint ∉ P.valuated := by
+lemma iff_isTrue_neg_fixpoint [M.IsNR] : ⊨ (~H).fixpoint ↔ ↑(~H).fixpoint ∉ H.valuated := by
   simp [Predicate.fixpoint, Sentence.iff_isTrue];
 
-lemma iff_isTrue_not_neg_fixpoint [M.IsNR] : ¬⊨ (~P).fixpoint ↔ ↑(~P).fixpoint ∈ P.valuated := by simpa using iff_isTrue_neg_fixpoint (P := P) |>.not;
+lemma iff_isTrue_not_neg_fixpoint [M.IsNR] : ¬⊨ (~H).fixpoint ↔ ↑(~H).fixpoint ∈ H.valuated := by simpa using iff_isTrue_neg_fixpoint (H := H) |>.not;
 
 lemma iff_mem_toWord_true_sentence_mem_true_sentence : (S.toWord ∈ Sentence.toWord '' M.true_sentences) ↔ (S ∈ M.true_sentences) := by
   apply Function.Injective.mem_set_image Sentence.toWord_injective;
 
-lemma iff_of_names_true_sentenes {P : M.Predicate} : P.names M.true_sentences → ∀ S : M.Sentence, (↑S ∈ P.valuated ↔ ⊨ S) := by
+lemma iff_of_names_true_sentenes {H : M.Predicate} : H.names M.true_sentences → ∀ S : M.Sentence, (↑S ∈ H.valuated ↔ ⊨ S) := by
   intro h S; rw [h];
   simp only [iff_mem_toWord_true_sentence_mem_true_sentence];
   tauto;
 
-theorem tarski [M.IsNR] : ¬∃ P : M.Predicate, P.names M.true_sentences := by
+theorem tarski [M.IsNR] : ¬∃ H : M.Predicate, H.names M.true_sentences := by
   by_contra hC;
-  obtain ⟨P, hP⟩ := hC;
-  let S := (~P).fixpoint;
-  have : ↑S ∈ P.valuated ↔ ⊨ S := iff_of_names_true_sentenes hP S;
+  obtain ⟨H, hH⟩ := hC;
+  let S := (~H).fixpoint;
+  have : ↑S ∈ H.valuated ↔ ⊨ S := iff_of_names_true_sentenes hH S;
   rw [iff_isTrue_neg_fixpoint] at this;
   tauto;
 
-theorem goedel1 [M.IsNR] (hP : P.valuated ⊆ M.true_sentences) : ∃ S : M.Sentence, ↑S ∉ P.valuated ∧ ↑(~S) ∉ P.valuated := by
-  let S := (~P).fixpoint;
+theorem goedel1 [M.IsNR] (hH : H.valuated ⊆ M.true_sentences) : ∃ S : M.Sentence, ↑S ∉ H.valuated ∧ ↑(~S) ∉ H.valuated := by
+  let S := (~H).fixpoint;
   use S;
   have h : ⊨ S := by
     by_contra hC;
-    have : ↑S ∈ P.valuated := iff_isTrue_not_neg_fixpoint.mp hC;
-    have : ⊨ S := iff_mem_toWord_true_sentence_mem_true_sentence.mp $ hP this;
+    have : ↑S ∈ H.valuated := iff_isTrue_not_neg_fixpoint.mp hC;
+    have : ⊨ S := iff_mem_toWord_true_sentence_mem_true_sentence.mp $ hH this;
     contradiction;
   constructor;
   . exact iff_isTrue_neg_fixpoint.mp h;
-  . apply Set.not_mem_subset (s := P.valuated) (t := M.true_sentences) hP;
+  . apply Set.not_mem_subset (s := H.valuated) (t := M.true_sentences) hH;
     apply iff_mem_toWord_true_sentence_mem_true_sentence.not.mpr;
     apply Sentence.iff_isNegTrue_not_isTrue.mp;
     apply Sentence.iff_isNegTrue_neg_isTrue.mpr;

@@ -1,6 +1,5 @@
 import SmullyanTP.List
-import Mathlib.Logic.ExistsUnique
-import Aesop
+import Mathlib.Data.Set.Image
 
 structure SmullyanModel where
   α : Type*

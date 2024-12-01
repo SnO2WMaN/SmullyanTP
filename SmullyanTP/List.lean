@@ -1,4 +1,8 @@
-import Mathlib.Tactic
+import Mathlib.Order.Basic
+import Mathlib.Data.List.Basic
+import Mathlib.Tactic.Lemma
+import Mathlib.Tactic.WLOG
+import Mathlib.Tactic.Use
 
 /-
   Proof by @iehality (Palalansoukî)
